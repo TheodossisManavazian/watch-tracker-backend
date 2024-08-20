@@ -13,7 +13,7 @@ def get_all_listings(conn: Connection) -> List[dict] | None:
     with conn.begin():
         results = listings_dao.get_all_listings(conn)
         if results:
-            return [obj_to_dict(Listing.from_db(result)) for result in results]
+            return [obj_to_dict(Listing(**result)) for result in results]
 
     return None
 

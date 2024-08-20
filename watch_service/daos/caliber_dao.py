@@ -27,7 +27,7 @@ def upsert_caliber_data(conn: Connection, payload: dict):
             brand = COALESCE(EXCLUDED.brand, caliber.brand),
             movement = COALESCE(EXCLUDED.movement, caliber.movement),
             power_reserve = COALESCE(EXCLUDED.power_reserve, caliber.power_reserve),
-            qty_jewels = COALESCE(EXCLUDED.qty_jewels caliber.qty_jewels)
+            qty_jewels = COALESCE(EXCLUDED.qty_jewels, caliber.qty_jewels)
         """
     conn.execute(text(sql), payload)
 
@@ -56,5 +56,4 @@ def get_caliber(conn: Connection, payload: dict):
         FROM caliber
         WHERE LOWER(brand) = LOWER(:brand) AND caliber = :caliber
     """
-    print(payload)
     return fetchone(conn, sql, payload)
