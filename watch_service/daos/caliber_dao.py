@@ -12,14 +12,16 @@ def upsert_caliber_data(conn: Connection, payload: dict):
             brand,
             movement,
             power_reserve,
-            qty_jewels
+            qty_jewels,
+            frequency
         )
         VALUES (
             :caliber, 
             :brand, 
             :movement, 
             :power_reserve, 
-            :qty_jewels
+            :qty_jewels,
+            :frequency
         )
         ON CONFLICT(caliber, brand)
         DO UPDATE SET
@@ -27,7 +29,8 @@ def upsert_caliber_data(conn: Connection, payload: dict):
             brand = COALESCE(EXCLUDED.brand, caliber.brand),
             movement = COALESCE(EXCLUDED.movement, caliber.movement),
             power_reserve = COALESCE(EXCLUDED.power_reserve, caliber.power_reserve),
-            qty_jewels = COALESCE(EXCLUDED.qty_jewels, caliber.qty_jewels)
+            qty_jewels = COALESCE(EXCLUDED.qty_jewels, caliber.qty_jewels),
+            frequency = COALESCE(EXCLUDED.frequency, caliber.frequency)
         """
     conn.execute(text(sql), payload)
 
@@ -39,7 +42,8 @@ def get_all_calibers(conn: Connection):
             brand,
             movement,
             power_reserve,
-            qty_jewels
+            qty_jewels,
+            frequency
         FROM caliber
     """
     return fetchall(conn, sql)
@@ -52,7 +56,8 @@ def get_caliber(conn: Connection, payload: dict):
             brand,
             movement,
             power_reserve,
-            qty_jewels
+            qty_jewels,
+            frequency
         FROM caliber
         WHERE LOWER(brand) = LOWER(:brand) AND caliber = :caliber
     """

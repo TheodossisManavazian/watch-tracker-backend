@@ -11,4 +11,4 @@ SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL').replace("://", "ql://",
 FAST_API_ORIGIN = os.getenv('FAST_API_ORIGIN')
 REACT_ORIGIN = os.getenv('REACT_ORIGIN')
 
-
+ENV = os.getenv('ENV')

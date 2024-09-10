@@ -6,8 +6,8 @@ class Watch(BaseModel):
     reference_number: str
     brand: str
     years_produced: str | None = None
-    model: str | None = None
     description: str | None = None
+    model: str | None = None
     pricing: dict | None = None
     case_info: dict | str | None = None
     dial: str | None = None

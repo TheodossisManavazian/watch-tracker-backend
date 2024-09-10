@@ -36,6 +36,5 @@ def get_watches_full_by_query(conn: Connection, payload: str) -> dict | None:
     return None
 
 def upsert_watch_data(conn: Connection, payload: dict):
-    payload = Watch(**payload)
     with conn.begin():
-        watch_dao.upsert_watch_data(conn, dict(payload))
+        watch_dao.upsert_watch_data(conn, payload)

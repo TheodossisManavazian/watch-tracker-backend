@@ -39,7 +39,20 @@ def upsert_listing_from_chrono24_service(conn: Connection, listing: dict) -> Lis
             
             try:
                 listings_dao.upsert_listing(conn, dict(Listing(**payload)))
-            except Exception:
+            except Exception as e:
+                payload['exception'] = e
                 not_inserted.append(payload)
     return not_inserted
 
+def upsert_processed_listings(conn: Connection, listings: List[dict]) -> None:
+    with conn.begin():
+        for l in listings:
+            payload = {**l}
+            payload = map_listing_from_scrape_payload(payload)
+            listings_dao.upsert_listing(conn, dict(Listing(**payload)))
+
+def upsert_processed_listing(conn: Connection, listing: dict) -> None:
+    with conn.begin():
+        payload = {**listing}
+        payload = map_listing_from_scrape_payload(payload)
+        listings_dao.upsert_listing(conn, dict(Listing(**payload)))

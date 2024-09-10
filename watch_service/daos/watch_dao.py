@@ -109,3 +109,22 @@ def get_watches_full_by_query(conn: Connection, payload: dict):
     """
 
     return fetchall(conn, sql, payload)
+
+def get_watches_full_by_like_reference_number(conn: Connection, payload: dict):
+    payload = {
+        "reference_number": f'%{payload["reference_number"]}%',
+    }
+
+    sql = """
+        SELECT
+            row_to_json(w.*) AS watch,
+            row_to_json(i.*) AS image_mapping,
+            row_to_json(c.*) AS caliber
+        FROM watch w
+        JOIN image_mappings i ON w.reference_number = i.reference_number
+        JOIN caliber c ON w.caliber = c.caliber
+        WHERE UPPER(w.reference_number) LIKE UPPER(:reference_number)
+        ORDER BY w.brand, w.model ASC
+    """
+
+    return fetchall(conn, sql, payload)

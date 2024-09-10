@@ -11,14 +11,14 @@ def upsert_image_mappings(conn: Connection, payload: Series):
         image_mappings(
             reference_number,
             brand,
-            image_name
+            image_path
         )
-        VALUES (:reference_number, :brand, :image_name)
+        VALUES (:reference_number, :brand, :image_path)
         ON CONFLICT(reference_number, brand)
         DO UPDATE SET
             reference_number = EXCLUDED.reference_number,
             brand = EXCLUDED.brand,
-            image_name = EXCLUDED.image_name
+            image_path = EXCLUDED.image_path
         """
     conn.execute(text(sql), payload)
 
@@ -28,7 +28,18 @@ def get_all_image_mappings(conn: Connection) -> List[tuple]:
         SELECT
             reference_number,
             brand,
-            image_name 
+            image_path
         FROM image_mappings
     """
     return fetchall(conn, sql)
+
+def get_all_image_mappings_by_brand(conn: Connection, payload: dict) -> List[tuple]:
+    sql = """
+        SELECT
+            reference_number,
+            brand,
+            image_path
+        FROM image_mappings
+        WHERE brand = :brand
+    """
+    return fetchall(conn, sql, payload)

@@ -26,7 +26,7 @@ def get_watch_image_mappings() -> dict:
     return {"data": data}
 
 
-@router.get("/full")
+@router.get("/full/all")
 def get_watches_full() -> dict:
     with engine.connect() as conn:
         data = watch_service.get_all_watches_full(conn)
@@ -36,7 +36,7 @@ def get_watches_full() -> dict:
     return {"data": data}
 
 
-@router.get("/full/{query}")
+@router.get("/full")
 def get_watches_full_ref(query: str) -> dict:
     with engine.connect() as conn:
         data = watch_service.get_watches_full_by_query(conn, query)

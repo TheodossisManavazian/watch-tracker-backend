@@ -1,14 +1,22 @@
+import sys
+import os
+
+root_path = "/".join(os.path.dirname(__file__).split("/")[:-2])
+sys.path.append(root_path)
+
 from bs4 import BeautifulSoup
 from typing import Union, List
 from watch_service import engine
+from scrape.utils import webscraping_utils
 from watch_service.utils import csv_utils
-from watch_service.services import watch_service
-from watch_service.services import listings_service
-from scrape.utils.webscraping_utils import extract_source
+from watch_service.services import listings_service, watch_service
+import time
 
-CHRONO24__BASE_URL = 'https://www.chrono24.com'
+CHRONO24__BASE_URL = "https://www.chrono24.com"
 CHRONO24__LISTINGS_BASE_URL = "https://www.chrono24.com/search/index.htm?query="
-CHRONO24__LISTINGS_URL_PARAMS = "&dosearch=true&searchexplain=false&watchTypes=U&pageSize=120&priceFrom=1"
+CHRONO24__LISTINGS_URL_PARAMS = (
+    "&dosearch=true&searchexplain=false&watchTypes=U&pageSize=120&priceFrom=1"
+)
 
 features = [
     "brand",
@@ -36,27 +44,18 @@ CHRONO24__FIELD_NAMES = {
 }
 
 
-def _load_waches() -> Union[List[dict], None]:
-    with engine.connect() as conn:
-        return watch_service.get_all_watches_full(conn)
+def _generate_query(brand: str, reference_number: str) -> dict:
+    if brand == "Rolex":
+        f_reference_number = reference_number.split("-")[0]
+    else:
+        f_reference_number = reference_number.split("/")
 
+        if len(f_reference_number) > 1:
+            f_reference_number = f"%2F".join(f_reference_number)
+        else:
+            f_reference_number = f_reference_number[0]
 
-# Chrono24 paramas are seperated by a '+'
-def _load_params(watch: dict) -> List:
-    params = []
-    if watch["nickname"]:
-        nn = "+".join(watch["nickname"].split(" "))
-        params.append(nn)
-    elif watch["dial"]:
-        params.append(f'{watch["dial"]}+Dial')
-    return params
-
-
-def _format_url(brand: str, reference_number: str, query_list: List) -> dict:
-    f_reference_number = reference_number.split("-")[0]
     query = f"{brand}+{f_reference_number}"
-    for p in query_list:
-        query += f"+{p}"
 
     return {
         "query": query,
@@ -64,10 +63,12 @@ def _format_url(brand: str, reference_number: str, query_list: List) -> dict:
     }
 
 
-def chrono24__collect_listings_from_all_pages(url: str, page_number: int, links: List) -> None:
+def chrono24__collect_listings_from_all_pages(
+    url: str, page_number: int, links: List
+) -> None:
     page_url = url + f"&showpage={page_number}"
 
-    source = extract_source(page_url)
+    source = webscraping_utils.extract_source(page_url)
     soup = BeautifulSoup(source, features="html.parser")
     watches = soup.find("div", id="wt-watches")
 
@@ -82,24 +83,44 @@ def chrono24__collect_listings_from_all_pages(url: str, page_number: int, links:
 
 
 def chrono_24__get_all_current_listings(
-    brand: str, reference_number: str, params: List
+    brand: str, reference_number: str
 ) -> Union[List, None]:
     links = []
-    f = _format_url(brand, reference_number, params)
+    f = _generate_query(brand, reference_number)
     query, url = f["query"], f["url"]
-    chrono24__collect_listings_from_all_pages(url, 1, links)
 
+    if query in queries:
+        return
+    queries.add(query)
+
+    print(f"using query {query}")
+    chrono24__collect_listings_from_all_pages(url, 1, links)
     return {"query": query, "links": links}
 
 
 def chrono24__extract_data_from_listing(
-    listing_url: str, data_to_extract: dict
+    listing_url: str,
+    data_to_extract: dict,
 ) -> Union[List[dict], None]:
-    source = extract_source(listing_url)
-    soup = BeautifulSoup(source, features="html.parser")
-    row = soup.find_all("td")
 
+    source = webscraping_utils.extract_source(listing_url)
+    soup = BeautifulSoup(source, features="html.parser")
+    main = soup.find("main", {"id": "main-content"})
+    container = main.find("div", "container")
+    row = main.find_all("td")
     payload = {"listing_url": listing_url}
+
+    if container:
+        title = container.find("span", "d-block")
+        if title:
+            payload["title"] = " ".join(title.text.split())
+
+    image_url = main.find("div", "watch-image-carousel-image")
+    if image_url:
+        if image_url.has_attr("style"):
+            payload["image_url"] = image_url["style"].replace(
+                "background-image: url('", ""
+            )[:-3]
 
     for i, val in data_to_extract.items():
         payload[val] = ""
@@ -111,7 +132,6 @@ def chrono24__extract_data_from_listing(
             feature = row[i].text
             data = row[i + 1].text.strip()
             data = data.split("\n")[0]
-
             payload[CHRONO24__FIELD_NAMES[feature]] = data
 
     return payload
@@ -120,24 +140,26 @@ def chrono24__extract_data_from_listing(
 def chrono24__extract_data_from_all_listings(
     brand: str,
     reference_number: str,
-    query_params: List,
     fields_to_extract: dict = CHRONO24__FIELD_NAMES,
 ) -> Union[List[dict], None]:
-    all_listings = chrono_24__get_all_current_listings(brand, reference_number, query_params)
+
+    all_listings = chrono_24__get_all_current_listings(brand, reference_number)
+    if not all_listings:
+        return
+
     query, links = all_listings["query"], all_listings["links"]
 
     res = {
         "reference_number": reference_number,
         "brand": brand,
         "query": query,
-        "listing_data": {},
+        "listing_data": [],
     }
 
     if len(all_listings) < 1:
         return res
 
     data = []
-
     for link in links:
         d = chrono24__extract_data_from_listing(link, fields_to_extract)
         if d is not None:
@@ -147,17 +169,33 @@ def chrono24__extract_data_from_all_listings(
     return res
 
 
-def get_insert_all_listings_for_each_reference_number():
-    WATCHES = _load_waches()
-    not_inserted = []
+def insert_all_listings_for_each_reference_number():
+    exceptions = []
+    lgs = []
+    with engine.connect() as conn:
+        WATCHES = watch_service.get_watches_full_by_query(conn, "Audemars Piguet")
 
     with engine.connect() as conn:
-        for watch in WATCHES:
-            params = _load_params(watch)
-            brand = watch["brand"]
-            reference_number = watch["reference_number"]
-            listings = chrono24__extract_data_from_all_listings(brand, reference_number, params)
-            not_inserted.extend(listings_service.upsert_listing_from_chrono24_service(conn, listings))
+        for w in WATCHES:
+            watch = w["watch"]
+            print(f"grabbing listings for {watch.reference_number}...")
+            try:
+                listings = chrono24__extract_data_from_all_listings(
+                    watch.brand, watch.reference_number
+                )
+            except:
+                exceptions.append(dict(watch))
+            if listings:
+                lgs.append(listings)
 
-    if len(not_inserted) > 0:
-        csv_utils.write_csv("not_inserted.csv", not_inserted)
+    if len(lgs) > 0:
+        csv_utils.write_csv("current_listings_ap.csv", lgs)
+    if len(exceptions) > 0:
+        csv_utils.write_csv("exceptions.csv", exceptions)
+
+
+queries = set()
+if __name__ == "__main__":
+    start_time = time.time()
+    insert_all_listings_for_each_reference_number()
+    print("--- %s seconds ---" % (time.time() - start_time))
